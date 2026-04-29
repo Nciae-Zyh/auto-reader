@@ -25,7 +25,7 @@ export default function Home() {
   const [readingMode, setReadingMode] = useState<ReadingMode>("ai");
   const [personalVoice, setPersonalVoice] = useState<string>("");
 
-  const { settings, apiKey, baseUrl, mounted } = useSettings();
+  const { settings, apiKey, baseUrl, mounted, serverMode, hasApiKey } = useSettings();
   const { t } = useI18n();
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
@@ -48,7 +48,7 @@ export default function Home() {
   );
 
   const handleAnalyze = async (article: string) => {
-    if (!apiKey) {
+    if (!hasApiKey) {
       setError(t("errorApiKey"));
       return;
     }
@@ -153,7 +153,7 @@ export default function Home() {
   );
 
   const handleGenerateAll = async () => {
-    if (!apiKey) {
+    if (!hasApiKey) {
       setError(t("errorApiKey"));
       return;
     }
@@ -229,7 +229,7 @@ export default function Home() {
   };
 
   const handleAnalyzeAndPlay = async (article: string) => {
-    if (!apiKey) {
+    if (!hasApiKey) {
       setError(t("errorApiKey"));
       return;
     }
@@ -372,7 +372,7 @@ export default function Home() {
         </p>
       </div>
 
-      {mounted && !apiKey && (
+      {mounted && !hasApiKey && (
         <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/30">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
             {t("apiKeyWarning")}{" "}
