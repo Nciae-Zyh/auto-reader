@@ -20,6 +20,11 @@ jobs:
         run: npm ci
 
       - name: Build for Cloudflare
+        env:
+          NEXT_PUBLIC_SERVER_MODE: "true"
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: npx opennextjs-cloudflare build
 
       - name: Deploy to Cloudflare Workers
@@ -34,6 +39,5 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           echo "${{ secrets.MIMO_API_KEY }}" | npx wrangler secret put MIMO_API_KEY --name auto-reader
-          echo "${{ secrets.GOOGLE_CLIENT_ID }}" | npx wrangler secret put GOOGLE_CLIENT_ID --name auto-reader
           echo "${{ secrets.GOOGLE_CLIENT_SECRET }}" | npx wrangler secret put GOOGLE_CLIENT_SECRET --name auto-reader
           echo "true" | npx wrangler secret put SERVER_MODE --name auto-reader

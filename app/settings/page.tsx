@@ -79,9 +79,14 @@ export default function SettingsPage() {
             {config.googleAuthEnabled ? "Enabled" : "Disabled"}
           </span>
         </div>
+        {config.googleClientId && (
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Client ID: {config.googleClientId.substring(0, 20)}...
+          </p>
+        )}
         {!config.googleAuthEnabled && (
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable Google login.
+            Set NEXT_PUBLIC_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable Google login.
           </p>
         )}
       </div>

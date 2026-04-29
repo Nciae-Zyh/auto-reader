@@ -9,28 +9,43 @@ const STORAGE_KEY = "auto-reader-settings";
 
 /**
  * Check if running in server mode
- * Server mode is enabled when SERVER_MODE=true or when MIMO_API_KEY is set via env
+ * Uses NEXT_PUBLIC_SERVER_MODE so it's available on client side
  */
 export function isServerMode(): boolean {
+  // Client-side: read from process.env (inlined at build time)
   if (typeof window !== "undefined") {
-    return false;
+    return (
+      process.env.NEXT_PUBLIC_SERVER_MODE === "true" ||
+      process.env.NEXT_PUBLIC_SERVER_MODE === "1"
+    );
   }
-  // Check SERVER_MODE env var, or fallback to checking if MIMO_API_KEY is set
+  // Server-side
   return (
-    process.env.SERVER_MODE === "true" ||
-    process.env.SERVER_MODE === "1" ||
+    process.env.NEXT_PUBLIC_SERVER_MODE === "true" ||
+    process.env.NEXT_PUBLIC_SERVER_MODE === "1" ||
     !!process.env.MIMO_API_KEY
   );
 }
 
 /**
  * Check if Google OAuth is configured
+ * Uses NEXT_PUBLIC_GOOGLE_CLIENT_ID so it's available on client side
  */
 export function isGoogleAuthEnabled(): boolean {
   if (typeof window !== "undefined") {
-    return false;
+    return !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   }
-  return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  return !!(
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID &&
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+}
+
+/**
+ * Get Google Client ID for OAuth (client-safe)
+ */
+export function getGoogleClientId(): string {
+  return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 }
 
 /**
@@ -76,25 +91,6 @@ export function getConfig(): AppConfig {
     apiKey: server.apiKey || client.apiKey || "",
     baseUrl: server.baseUrl || client.baseUrl || DEFAULT_BASE_URL,
     ttsModel: server.ttsModel || client.ttsModel || "mimo-v2.5-tts-voicedesign",
-  };
-}
-
-/**
- * Debug: Get all config sources (for troubleshooting)
- */
-export function getDebugInfo(): Record<string, unknown> {
-  if (typeof window !== "undefined") {
-    return { location: "client" };
-  }
-
-  return {
-    location: "server",
-    serverMode: process.env.SERVER_MODE,
-    hasApiKey: !!process.env.MIMO_API_KEY,
-    hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
-    hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-    baseUrl: process.env.MIMO_BASE_URL || DEFAULT_BASE_URL,
-    ttsModel: process.env.MIMO_TTS_MODEL,
   };
 }
 
