@@ -3,14 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "./ThemeProvider";
+import { useI18n } from "./I18nProvider";
 
 export default function Header() {
   const pathname = usePathname();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { locale, setLocale, t } = useI18n();
 
   const cycleTheme = () => {
     const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
     setTheme(next);
+  };
+
+  const toggleLocale = () => {
+    setLocale(locale === "zh" ? "en" : "zh");
   };
 
   return (
@@ -18,13 +24,13 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl font-bold text-gray-900 dark:text-white">
-            Auto Reader
+            {t("appName")}
           </span>
           <span className="text-sm text-gray-500 dark:text-gray-400">
-            AI 语音朗读
+            {t("appDesc")}
           </span>
         </Link>
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-3">
           <Link
             href="/"
             className={`text-sm font-medium transition-colors ${
@@ -33,7 +39,7 @@ export default function Header() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
             }`}
           >
-            首页
+            {t("navHome")}
           </Link>
           <Link
             href="/settings"
@@ -43,12 +49,27 @@ export default function Header() {
                 : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
             }`}
           >
-            设置
+            {t("navSettings")}
           </Link>
+
+          {/* Language toggle */}
+          <button
+            onClick={toggleLocale}
+            className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            title={locale === "zh" ? "Switch to English" : "切换到中文"}
+          >
+            {locale === "zh" ? "EN" : "中"}
+          </button>
+
+          {/* Theme toggle */}
           <button
             onClick={cycleTheme}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            title={`当前: ${theme === "system" ? "跟随系统" : theme === "dark" ? "深色" : "浅色"}`}
+            title={
+              resolvedTheme === "dark"
+                ? "Switch to light mode"
+                : "Switch to dark mode"
+            }
           >
             {resolvedTheme === "dark" ? (
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

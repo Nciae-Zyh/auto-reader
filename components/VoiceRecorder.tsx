@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useI18n } from "./I18nProvider";
 
 interface VoiceRecorderProps {
   onRecordingComplete: (audioBase64: string) => void;
 }
 
 export default function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProps) {
+  const { t } = useI18n();
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState("");
@@ -48,9 +50,9 @@ export default function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProp
         setDuration((prev) => prev + 1);
       }, 1000);
     } catch {
-      setError("无法访问麦克风，请检查浏览器权限设置");
+      setError(t("micError"));
     }
-  }, [onRecordingComplete]);
+  }, [onRecordingComplete, t]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -81,7 +83,7 @@ export default function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProp
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
               <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
             </svg>
-            开始录音
+            {t("startRecord")}
           </button>
         ) : (
           <button
@@ -89,7 +91,7 @@ export default function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProp
             className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-gray-700"
           >
             <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-            录音中 {formatDuration(duration)}
+            {t("recording", { time: formatDuration(duration) })}
           </button>
         )}
 
@@ -114,7 +116,7 @@ export default function VoiceRecorder({ onRecordingComplete }: VoiceRecorderProp
       )}
 
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        建议录制 5-10 秒的清晰语音，用于克隆您的音色
+        {t("recordHint")}
       </p>
     </div>
   );

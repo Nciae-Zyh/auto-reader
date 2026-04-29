@@ -6,6 +6,7 @@ import SegmentCard from "@/components/SegmentCard";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import VoiceUploader from "@/components/VoiceUploader";
 import { useSettings } from "@/lib/use-settings";
+import { useI18n } from "@/components/I18nProvider";
 import { mergeAudioFiles, downloadBlob } from "@/lib/audio-merger";
 import type { ArticleSegment, ReadingMode } from "@/lib/types";
 
@@ -25,6 +26,7 @@ export default function Home() {
   const [personalVoice, setPersonalVoice] = useState<string>("");
 
   const { settings, apiKey, baseUrl, mounted } = useSettings();
+  const { t } = useI18n();
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
   const characterAudiosRef = useRef(characterAudios);
@@ -47,7 +49,7 @@ export default function Home() {
 
   const handleAnalyze = async (article: string) => {
     if (!apiKey) {
-      setError("请先在设置页面配置 MiMo API Key");
+      setError(t("errorApiKey"));
       return;
     }
 
@@ -75,7 +77,7 @@ export default function Home() {
       setSummary(data.summary || "");
       setSegments(data.segments || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "分析失败");
+      setError(err instanceof Error ? err.message : t("errorAnalyze"));
     } finally {
       setIsAnalyzing(false);
     }
@@ -152,12 +154,12 @@ export default function Home() {
 
   const handleGenerateAll = async () => {
     if (!apiKey) {
-      setError("请先在设置页面配置 MiMo API Key");
+      setError(t("errorApiKey"));
       return;
     }
 
     if (readingMode === "personal" && !personalVoice) {
-      setError("个人朗读模式下，请先录制或上传您的声音");
+      setError(t("errorPersonalMode"));
       return;
     }
 
@@ -228,12 +230,12 @@ export default function Home() {
 
   const handleAnalyzeAndPlay = async (article: string) => {
     if (!apiKey) {
-      setError("请先在设置页面配置 MiMo API Key");
+      setError(t("errorApiKey"));
       return;
     }
 
     if (readingMode === "personal" && !personalVoice) {
-      setError("个人朗读模式下，请先录制或上传您的声音");
+      setError(t("errorPersonalMode"));
       return;
     }
 
@@ -348,7 +350,7 @@ export default function Home() {
       const filename = title ? `${title}.wav` : "audio_output.wav";
       downloadBlob(mergedBlob, filename);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "合并音频失败");
+      setError(err instanceof Error ? err.message : t("errorMerge"));
     } finally {
       setIsMerging(false);
     }
@@ -363,21 +365,20 @@ export default function Home() {
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          文章朗读
+          {t("homeTitle")}
         </h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          粘贴文章，AI 自动分析角色并生成语音朗读
+          {t("homeDesc")}
         </p>
       </div>
 
       {mounted && !apiKey && (
         <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/30">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            请先{" "}
+            {t("apiKeyWarning")}{" "}
             <a href="/settings" className="font-medium underline">
-              配置 MiMo API Key
-            </a>{" "}
-            后再使用。
+              {t("configureLink")}
+            </a>
           </p>
         </div>
       )}
@@ -385,7 +386,7 @@ export default function Home() {
       {/* Reading Mode Selector */}
       <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
         <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-white">
-          朗读模式
+          {t("readingMode")}
         </h3>
         <div className="flex gap-4">
           <label
@@ -405,10 +406,10 @@ export default function Home() {
             />
             <div>
               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                AI 智能模式
+                {t("aiMode")}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                自动分配不同角色音色
+                {t("aiModeDesc")}
               </div>
             </div>
           </label>
@@ -430,10 +431,10 @@ export default function Home() {
             />
             <div>
               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                个人朗读模式
+                {t("personalMode")}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                使用您的声音朗读全文
+                {t("personalModeDesc")}
               </div>
             </div>
           </label>
@@ -454,13 +455,13 @@ export default function Home() {
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  声音已就绪
+                  {t("voiceReady")}
                 </div>
                 <button
                   onClick={() => setPersonalVoice("")}
                   className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                 >
-                  重新录制
+                  {t("reRecord")}
                 </button>
               </div>
             ) : (
@@ -468,7 +469,7 @@ export default function Home() {
                 <div className="flex gap-4">
                   <div className="flex-1">
                     <h4 className="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                      录制声音
+                      {t("recordVoice")}
                     </h4>
                     <VoiceRecorder
                       onRecordingComplete={setPersonalVoice}
@@ -477,7 +478,7 @@ export default function Home() {
                   <div className="w-px bg-gray-200 dark:bg-gray-600" />
                   <div className="flex-1">
                     <h4 className="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                      上传音频
+                      {t("uploadVoice")}
                     </h4>
                     <VoiceUploader
                       onUploadComplete={setPersonalVoice}
@@ -519,7 +520,7 @@ export default function Home() {
             </div>
             {readingMode === "personal" && (
               <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                个人朗读
+                {t("personalBadge")}
               </span>
             )}
           </div>
@@ -528,7 +529,7 @@ export default function Home() {
           {isGeneratingAll && (
             <div className="mb-4">
               <div className="mb-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                <span>生成进度</span>
+                <span>{t("generateProgress")}</span>
                 <span>
                   {generatedCount} / {totalCount}
                 </span>
@@ -570,7 +571,7 @@ export default function Home() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  生成中...
+                  {t("generating")}
                 </>
               ) : allGenerated ? (
                 <>
@@ -583,7 +584,7 @@ export default function Home() {
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  全部完成
+                  {t("allDone")}
                 </>
               ) : (
                 <>
@@ -596,7 +597,7 @@ export default function Home() {
                   >
                     <polygon points="5 3 19 12 5 21 5 3" />
                   </svg>
-                  全部生成
+                  {t("generateAll")}
                 </>
               )}
             </button>
@@ -628,7 +629,7 @@ export default function Home() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                       />
                     </svg>
-                    合并中...
+                    {t("merging")}
                   </>
                 ) : (
                   <>
@@ -643,7 +644,7 @@ export default function Home() {
                       <polyline points="7 10 12 15 17 10" />
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    下载完整音频
+                    {t("downloadAudio")}
                   </>
                 )}
               </button>
@@ -651,7 +652,7 @@ export default function Home() {
 
             {!isGeneratingAll && !allGenerated && generatedCount > 0 && (
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                还剩 {totalCount - generatedCount} 个未生成
+                {t("remaining", { count: totalCount - generatedCount })}
               </span>
             )}
           </div>

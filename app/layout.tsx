@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { I18nProvider } from "@/components/I18nProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Auto Reader - AI 语音朗读",
-  description: "利用 MiMo AI 自动分析文章角色并生成语音朗读",
+  title: "Auto Reader - AI Voice Reading",
+  description: "AI-powered article analysis and voice reading with MiMo",
 };
 
 export default function RootLayout({
@@ -35,8 +36,10 @@ export default function RootLayout({
         className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100"
       >
         <ThemeProvider>
-          <Header />
-          <main className="flex-1">{children}</main>
+          <I18nProvider>
+            <Header />
+            <main className="flex-1">{children}</main>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

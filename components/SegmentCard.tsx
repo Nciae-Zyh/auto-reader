@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import AudioPlayer, { type AudioPlayerHandle } from "./AudioPlayer";
+import { useI18n } from "./I18nProvider";
 import type { ArticleSegment, TTSModel } from "@/lib/types";
 
 interface SegmentCardProps {
@@ -29,6 +30,7 @@ export default function SegmentCard({
   onGenerateComplete,
   onPlayNext,
 }: SegmentCardProps) {
+  const { t } = useI18n();
   const [audioBase64, setAudioBase64] = useState(segment.audioBase64 || "");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -137,7 +139,7 @@ export default function SegmentCard({
               : "bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-300"
           }`}
         >
-          {isNarration ? "旁白" : "对话"}
+          {isNarration ? t("narration") : t("dialogue")}
         </span>
         <span className="text-sm font-medium text-gray-900 dark:text-white">
           {segment.character}
@@ -148,14 +150,14 @@ export default function SegmentCard({
 
         {/* Show which model will be used */}
         <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500">
-          {segment.isFirstOfCharacter ? "音色设计" : "音色克隆"}
+          {segment.isFirstOfCharacter ? t("voiceDesign") : t("voiceClone")}
         </span>
 
         {isCurrentGenerating && (
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
             <span className="text-xs text-blue-600 dark:text-blue-400">
-              生成中...
+              {t("generatingVoice")}
             </span>
           </div>
         )}
@@ -171,7 +173,7 @@ export default function SegmentCard({
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            <span className="text-xs">完成</span>
+            <span className="text-xs">{t("completed")}</span>
           </div>
         )}
       </div>
@@ -188,14 +190,14 @@ export default function SegmentCard({
 
       {segment.voiceDescription && (
         <div className="mb-2 rounded bg-white/80 p-2 text-xs text-gray-500 dark:bg-gray-700/80 dark:text-gray-400">
-          <span className="font-medium">音色：</span>
+          <span className="font-medium">{t("voiceLabel")}</span>
           {segment.voiceDescription}
         </div>
       )}
 
       {segment.styleInstruction && (
         <div className="mb-3 rounded bg-white/80 p-2 text-xs text-gray-500 dark:bg-gray-700/80 dark:text-gray-400">
-          <span className="font-medium">风格：</span>
+          <span className="font-medium">{t("styleLabel")}</span>
           {segment.styleInstruction}
         </div>
       )}
@@ -244,7 +246,7 @@ export default function SegmentCard({
                   />
                 </svg>
               </div>
-              生成中...
+              {t("generatingVoice")}
             </>
           ) : (
             <>
@@ -258,7 +260,7 @@ export default function SegmentCard({
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
               </svg>
-              生成语音
+              {t("generateVoice")}
             </>
           )}
         </button>

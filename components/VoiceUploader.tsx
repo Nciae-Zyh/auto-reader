@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useI18n } from "./I18nProvider";
 
 interface VoiceUploaderProps {
   onUploadComplete: (audioBase64: string) => void;
 }
 
 export default function VoiceUploader({ onUploadComplete }: VoiceUploaderProps) {
+  const { t } = useI18n();
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -21,13 +23,13 @@ export default function VoiceUploader({ onUploadComplete }: VoiceUploaderProps) 
     // Validate file type
     const validTypes = ["audio/wav", "audio/mpeg", "audio/mp3", "audio/webm"];
     if (!validTypes.includes(file.type) && !file.name.match(/\.(wav|mp3|webm)$/i)) {
-      setError("仅支持 WAV、MP3、WebM 格式的音频文件");
+      setError(t("uploadErrorType"));
       return;
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setError("音频文件不能超过 10MB");
+      setError(t("uploadErrorSize"));
       return;
     }
 
@@ -36,7 +38,7 @@ export default function VoiceUploader({ onUploadComplete }: VoiceUploaderProps) 
       const base64 = arrayBufferToBase64(arrayBuffer);
       onUploadComplete(base64);
     } catch {
-      setError("读取文件失败，请重试");
+      setError(t("uploadErrorRead"));
     }
   };
 
@@ -68,7 +70,7 @@ export default function VoiceUploader({ onUploadComplete }: VoiceUploaderProps) 
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-          上传音频文件
+          {t("uploadFile")}
         </button>
       </div>
 
@@ -86,7 +88,7 @@ export default function VoiceUploader({ onUploadComplete }: VoiceUploaderProps) 
       )}
 
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        支持 WAV、MP3、WebM 格式，最大 10MB
+        {t("uploadHint")}
       </p>
     </div>
   );

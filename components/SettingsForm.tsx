@@ -8,6 +8,7 @@ import {
   TTS_MODEL_OPTIONS,
 } from "@/lib/types";
 import { DEFAULT_BASE_URL } from "@/lib/config";
+import { useI18n } from "./I18nProvider";
 
 const STORAGE_KEY = "auto-reader-settings";
 
@@ -27,6 +28,7 @@ function saveSettings(settings: Settings) {
 }
 
 export default function SettingsForm({ serverMode = false }: { serverMode?: boolean }) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
 
@@ -45,7 +47,7 @@ export default function SettingsForm({ serverMode = false }: { serverMode?: bool
       {serverMode && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/30">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            服务器模式：API Key 和 Base URL 已通过环境变量配置，无需在前端设置。
+            {t("serverMode")}
           </p>
         </div>
       )}
@@ -55,7 +57,7 @@ export default function SettingsForm({ serverMode = false }: { serverMode?: bool
           htmlFor="apiKey"
           className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
-          MiMo API Key
+          {t("apiKeyLabel")}
         </label>
         <input
           id="apiKey"
@@ -64,21 +66,12 @@ export default function SettingsForm({ serverMode = false }: { serverMode?: bool
           onChange={(e) =>
             setSettings({ ...settings, apiKey: e.target.value })
           }
-          placeholder="请输入您的 MiMo API Key"
+          placeholder={t("apiKeyPlaceholder")}
           disabled={serverMode}
           className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-blue-400"
         />
         <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-          从{" "}
-          <a
-            href="https://platform.xiaomimimo.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline dark:text-blue-400"
-          >
-            Xiaomi MiMo 开放平台
-          </a>{" "}
-          获取 API Key
+          {t("apiKeyGetFrom")}
         </p>
       </div>
 
@@ -87,7 +80,7 @@ export default function SettingsForm({ serverMode = false }: { serverMode?: bool
           htmlFor="baseUrl"
           className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
-          API Base URL
+          {t("baseUrlLabel")}
         </label>
         <input
           id="baseUrl"
@@ -101,16 +94,20 @@ export default function SettingsForm({ serverMode = false }: { serverMode?: bool
           className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-blue-400"
         />
         <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-          默认: {DEFAULT_BASE_URL}（如使用代理或自部署可修改）
+          {t("baseUrlDefault")}: {DEFAULT_BASE_URL}（{t("baseUrlHint")}）
         </p>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          TTS 模型
+          {t("ttsModel")}
         </label>
         <div className="space-y-3">
-          {TTS_MODEL_OPTIONS.map((option) => (
+          {[
+            { value: "mimo-v2.5-tts-voicedesign" as TTSModel, labelKey: "ttsDesign" as const, descKey: "ttsDesignDesc" as const },
+            { value: "mimo-v2.5-tts" as TTSModel, labelKey: "ttsPreset" as const, descKey: "ttsPresetDesc" as const },
+            { value: "mimo-v2.5-tts-voiceclone" as TTSModel, labelKey: "ttsClone" as const, descKey: "ttsCloneDesc" as const },
+          ].map((option) => (
             <label
               key={option.value}
               className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
@@ -134,10 +131,10 @@ export default function SettingsForm({ serverMode = false }: { serverMode?: bool
               />
               <div>
                 <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {option.label}
+                  {t(option.labelKey)}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {option.description}
+                  {t(option.descKey)}
                 </div>
               </div>
             </label>
@@ -155,10 +152,10 @@ export default function SettingsForm({ serverMode = false }: { serverMode?: bool
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              已保存
+              {t("saved")}
             </>
           ) : (
-            "保存设置"
+            t("saveSettings")
           )}
         </button>
       )}

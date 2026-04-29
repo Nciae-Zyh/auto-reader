@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useI18n } from "./I18nProvider";
 
 interface ArticleInputProps {
   onAnalyze: (article: string) => void;
@@ -14,6 +15,7 @@ export default function ArticleInput({
   isLoading,
 }: ArticleInputProps) {
   const [article, setArticle] = useState("");
+  const { t } = useI18n();
 
   const handleAnalyze = () => {
     if (article.trim() && !isLoading) {
@@ -34,20 +36,20 @@ export default function ArticleInput({
           htmlFor="article"
           className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
-          粘贴文章内容
+          {t("articleLabel")}
         </label>
         <textarea
           id="article"
           value={article}
           onChange={(e) => setArticle(e.target.value)}
-          placeholder="在此粘贴您想要朗读的文章内容...&#10;&#10;支持包含多角色对话的小说、故事、新闻等文本。系统会自动识别角色并分配合适的音色。"
+          placeholder={t("articlePlaceholder")}
           className="h-64 w-full rounded-lg border border-gray-300 bg-white p-4 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-blue-400"
           disabled={isLoading}
         />
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          {article.length > 0 && `${article.length} 字`}
+          {article.length > 0 && t("charCount", { count: article.length })}
         </span>
         <div className="flex items-center gap-3">
           <button
@@ -61,10 +63,10 @@ export default function ArticleInput({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                分析中...
+                {t("analyzing")}
               </>
             ) : (
-              "开始分析"
+              t("startAnalyze")
             )}
           </button>
           <button
@@ -78,14 +80,14 @@ export default function ArticleInput({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                处理中...
+                {t("processing")}
               </>
             ) : (
               <>
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
-                开始生成
+                {t("startGenerate")}
               </>
             )}
           </button>
