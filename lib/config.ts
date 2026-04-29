@@ -9,15 +9,18 @@ const STORAGE_KEY = "auto-reader-settings";
 
 /**
  * Check if running in server mode
- * Server mode is enabled when SERVER_MODE=true or when D1/R2 bindings are available
+ * Server mode is enabled when SERVER_MODE=true or when MIMO_API_KEY is set via env
  */
 export function isServerMode(): boolean {
   if (typeof window !== "undefined") {
-    // Client-side: check if we're in server mode via API
     return false;
   }
-  // Server-side: check environment variable
-  return process.env.SERVER_MODE === "true" || process.env.SERVER_MODE === "1";
+  // Check SERVER_MODE env var, or fallback to checking if MIMO_API_KEY is set
+  return (
+    process.env.SERVER_MODE === "true" ||
+    process.env.SERVER_MODE === "1" ||
+    !!process.env.MIMO_API_KEY
+  );
 }
 
 /**
@@ -73,6 +76,25 @@ export function getConfig(): AppConfig {
     apiKey: server.apiKey || client.apiKey || "",
     baseUrl: server.baseUrl || client.baseUrl || DEFAULT_BASE_URL,
     ttsModel: server.ttsModel || client.ttsModel || "mimo-v2.5-tts-voicedesign",
+  };
+}
+
+/**
+ * Debug: Get all config sources (for troubleshooting)
+ */
+export function getDebugInfo(): Record<string, unknown> {
+  if (typeof window !== "undefined") {
+    return { location: "client" };
+  }
+
+  return {
+    location: "server",
+    serverMode: process.env.SERVER_MODE,
+    hasApiKey: !!process.env.MIMO_API_KEY,
+    hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+    hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+    baseUrl: process.env.MIMO_BASE_URL || DEFAULT_BASE_URL,
+    ttsModel: process.env.MIMO_TTS_MODEL,
   };
 }
 

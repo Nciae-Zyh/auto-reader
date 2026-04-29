@@ -7,8 +7,7 @@ import { useI18n } from "@/components/I18nProvider";
 interface ConfigStatus {
   serverMode: boolean;
   googleAuthEnabled: boolean;
-  hasApiKey: boolean;
-  hasBaseUrl: boolean;
+  googleClientId: string;
 }
 
 export default function SettingsPage() {
@@ -16,8 +15,7 @@ export default function SettingsPage() {
   const [config, setConfig] = useState<ConfigStatus>({
     serverMode: false,
     googleAuthEnabled: false,
-    hasApiKey: false,
-    hasBaseUrl: false,
+    googleClientId: "",
   });
 
   useEffect(() => {
@@ -86,6 +84,10 @@ export default function SettingsPage() {
             Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable Google login.
           </p>
         )}
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <SettingsForm serverMode={config.serverMode} />
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
