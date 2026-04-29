@@ -51,6 +51,16 @@ export default function Header() {
           >
             {t("navSettings")}
           </Link>
+          <Link
+            href="/history"
+            className={`text-sm font-medium transition-colors ${
+              pathname === "/history"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+            }`}
+          >
+            {t("navHistory")}
+          </Link>
 
           {/* Language toggle */}
           <button

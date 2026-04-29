@@ -7,6 +7,7 @@ const translations = {
     appDesc: "AI 语音朗读",
     navHome: "首页",
     navSettings: "设置",
+    navHistory: "历史记录",
 
     // Home page
     homeTitle: "文章朗读",
@@ -116,6 +117,7 @@ const translations = {
     appDesc: "AI Voice Reading",
     navHome: "Home",
     navSettings: "Settings",
+    navHistory: "History",
 
     // Home page
     homeTitle: "Article Reading",

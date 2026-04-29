@@ -8,6 +8,29 @@ const DEFAULT_BASE_URL = "https://api.xiaomimimo.com/v1";
 const STORAGE_KEY = "auto-reader-settings";
 
 /**
+ * Check if running in server mode
+ * Server mode is enabled when SERVER_MODE=true or when D1/R2 bindings are available
+ */
+export function isServerMode(): boolean {
+  if (typeof window !== "undefined") {
+    // Client-side: check if we're in server mode via API
+    return false;
+  }
+  // Server-side: check environment variable
+  return process.env.SERVER_MODE === "true" || process.env.SERVER_MODE === "1";
+}
+
+/**
+ * Check if Google OAuth is configured
+ */
+export function isGoogleAuthEnabled(): boolean {
+  if (typeof window !== "undefined") {
+    return false;
+  }
+  return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+/**
  * Get config from environment variables (server-side only)
  */
 export function getServerConfig(): Partial<AppConfig> {
@@ -51,16 +74,6 @@ export function getConfig(): AppConfig {
     baseUrl: server.baseUrl || client.baseUrl || DEFAULT_BASE_URL,
     ttsModel: server.ttsModel || client.ttsModel || "mimo-v2.5-tts-voicedesign",
   };
-}
-
-/**
- * Check if running in server-only mode (env vars configured, no frontend settings)
- */
-export function isServerMode(): boolean {
-  if (typeof window !== "undefined") {
-    return false;
-  }
-  return !!process.env.MIMO_API_KEY;
 }
 
 export { DEFAULT_BASE_URL };
