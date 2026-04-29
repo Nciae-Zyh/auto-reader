@@ -4,20 +4,21 @@ import { getServerConfig } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
   try {
-    const { article, apiKey, baseUrl } = await request.json();
+    const { article, baseUrl } = await request.json();
     const serverConfig = getServerConfig();
 
-    const finalApiKey = serverConfig.apiKey || apiKey;
+    // Always use server-side API key, never from request
+    const apiKey = serverConfig.apiKey;
     const finalBaseUrl = serverConfig.baseUrl || baseUrl;
 
-    if (!article || !finalApiKey) {
+    if (!article || !apiKey) {
       return NextResponse.json(
         { error: "文章内容和 API Key 为必填项" },
         { status: 400 }
       );
     }
 
-    const result = await analyzeArticle(article, finalApiKey, finalBaseUrl);
+    const result = await analyzeArticle(article, apiKey, finalBaseUrl);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Analyze error:", error);

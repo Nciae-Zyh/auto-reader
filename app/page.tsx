@@ -25,7 +25,7 @@ export default function Home() {
   const [readingMode, setReadingMode] = useState<ReadingMode>("ai");
   const [personalVoice, setPersonalVoice] = useState<string>("");
 
-  const { settings, apiKey, baseUrl, mounted, serverMode, hasApiKey } = useSettings();
+  const { settings, baseUrl, mounted, serverMode, hasApiKey } = useSettings();
   const { t } = useI18n();
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
@@ -64,7 +64,7 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ article, apiKey, baseUrl }),
+        body: JSON.stringify({ article, baseUrl }),
       });
 
       if (!res.ok) {
@@ -125,7 +125,6 @@ export default function Home() {
         body: JSON.stringify({
           segment,
           model: settings.ttsModel,
-          apiKey,
           baseUrl,
           effectiveModel,
           referenceAudio,
@@ -149,7 +148,7 @@ export default function Home() {
 
       return data.audioBase64;
     },
-    [apiKey, baseUrl, settings.ttsModel]
+    [baseUrl, settings.ttsModel]
   );
 
   const handleGenerateAll = async () => {
@@ -250,7 +249,7 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ article, apiKey, baseUrl }),
+        body: JSON.stringify({ article, baseUrl }),
       });
 
       if (!res.ok) {
@@ -665,7 +664,6 @@ export default function Home() {
                 segment={segment}
                 index={index}
                 ttsModel={settings.ttsModel}
-                apiKey={apiKey}
                 baseUrl={baseUrl}
                 isGeneratingAll={isGeneratingAll}
                 generationIndex={generationIndex}

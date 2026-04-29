@@ -9,7 +9,6 @@ interface SegmentCardProps {
   segment: ArticleSegment;
   index: number;
   ttsModel: TTSModel;
-  apiKey: string;
   baseUrl: string;
   isGeneratingAll?: boolean;
   generationIndex?: number;
@@ -22,7 +21,6 @@ export default function SegmentCard({
   segment,
   index,
   ttsModel,
-  apiKey,
   baseUrl,
   isGeneratingAll = false,
   generationIndex,
@@ -76,7 +74,6 @@ export default function SegmentCard({
         body: JSON.stringify({
           segment,
           model: ttsModel,
-          apiKey,
           baseUrl,
           effectiveModel,
           referenceAudio,
@@ -101,7 +98,6 @@ export default function SegmentCard({
   }, [
     segment,
     ttsModel,
-    apiKey,
     baseUrl,
     effectiveModel,
     characterAudios,
