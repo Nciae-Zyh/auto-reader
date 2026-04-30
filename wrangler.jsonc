@@ -23,7 +23,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "auto-reader-db"
+      "database_name": "auto-reader-db-prod"
     }
   ],
   "r2_buckets": [
