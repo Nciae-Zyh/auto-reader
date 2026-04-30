@@ -91,10 +91,11 @@ export async function getDB(): Promise<D1Database> {
 
 /**
  * Initialize database schema
+ * D1 doesn't support multiple statements in exec(), so we execute one by one
  */
 export async function initDB(db: D1Database): Promise<void> {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       google_id TEXT UNIQUE NOT NULL,
       email TEXT NOT NULL,
@@ -102,9 +103,8 @@ export async function initDB(db: D1Database): Promise<void> {
       avatar_url TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS generation_records (
+    )`,
+    `CREATE TABLE IF NOT EXISTS generation_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       title TEXT NOT NULL DEFAULT '',
@@ -116,23 +116,24 @@ export async function initDB(db: D1Database): Promise<void> {
       segment_count INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_generation_records_user_id ON generation_records(user_id);
-    CREATE INDEX IF NOT EXISTS idx_generation_records_created_at ON generation_records(created_at);
-
-    CREATE TABLE IF NOT EXISTS usage_records (
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_generation_records_user_id ON generation_records(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_generation_records_created_at ON generation_records(created_at)`,
+    `CREATE TABLE IF NOT EXISTS usage_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       identifier TEXT NOT NULL,
       user_id INTEGER,
       action TEXT NOT NULL,
       ip_address TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_usage_records_identifier ON usage_records(identifier)`,
+    `CREATE INDEX IF NOT EXISTS idx_usage_records_created_at ON usage_records(created_at)`,
+  ];
 
-    CREATE INDEX IF NOT EXISTS idx_usage_records_identifier ON usage_records(identifier);
-    CREATE INDEX IF NOT EXISTS idx_usage_records_created_at ON usage_records(created_at);
-  `);
+  for (const sql of statements) {
+    await db.exec(sql);
+  }
 }
 
 // Track migration state
