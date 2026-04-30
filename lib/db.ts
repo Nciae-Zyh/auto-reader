@@ -55,7 +55,6 @@ export async function getDB(): Promise<D1Database> {
  * Initialize database schema
  */
 export async function initDB(db: D1Database): Promise<void> {
-  // Users table
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +67,6 @@ export async function initDB(db: D1Database): Promise<void> {
     )
   `).run();
 
-  // Analysis records - summary table (no article content)
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS analysis_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,7 +85,6 @@ export async function initDB(db: D1Database): Promise<void> {
     )
   `).run();
 
-  // Article content - separate table for full text
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS article_contents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,7 +96,6 @@ export async function initDB(db: D1Database): Promise<void> {
     )
   `).run();
 
-  // Audio segments - linked to analysis_records
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS audio_segments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -118,7 +114,6 @@ export async function initDB(db: D1Database): Promise<void> {
     )
   `).run();
 
-  // Usage records for rate limiting
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS usage_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,7 +125,6 @@ export async function initDB(db: D1Database): Promise<void> {
     )
   `).run();
 
-  // Indexes
   const indexes = [
     "CREATE INDEX IF NOT EXISTS idx_analysis_records_user_id ON analysis_records(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_analysis_records_created_at ON analysis_records(created_at DESC)",
@@ -147,45 +141,97 @@ export async function initDB(db: D1Database): Promise<void> {
 }
 
 /**
- * Check and add missing columns to existing tables
+ * Full schema definition for each table
  */
-async function migrateDB(db: D1Database): Promise<void> {
-  const tableColumns: Record<string, Record<string, string>> = {
-    analysis_records: {
-      ip_address: "TEXT DEFAULT ''",
-      total_duration: "INTEGER DEFAULT 0",
-      merged_audio_key: "TEXT DEFAULT ''",
+const SCHEMA: Record<string, { columns: Record<string, string> }> = {
+  users: {
+    columns: {
+      id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+      google_id: "TEXT UNIQUE NOT NULL",
+      email: "TEXT NOT NULL",
+      name: "TEXT NOT NULL",
+      avatar_url: "TEXT DEFAULT ''",
+      created_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
+      updated_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
     },
-    audio_segments: {
+  },
+  analysis_records: {
+    columns: {
+      id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+      user_id: "INTEGER",
+      ip_address: "TEXT DEFAULT ''",
+      title: "TEXT NOT NULL DEFAULT ''",
+      summary: "TEXT NOT NULL DEFAULT ''",
+      segment_count: "INTEGER DEFAULT 0",
+      reading_mode: "TEXT NOT NULL DEFAULT 'ai'",
+      tts_model: "TEXT NOT NULL DEFAULT 'mimo-v2.5-tts-voicedesign'",
+      status: "TEXT NOT NULL DEFAULT 'pending'",
+      merged_audio_key: "TEXT DEFAULT ''",
+      total_duration: "INTEGER DEFAULT 0",
+      created_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
+    },
+  },
+  article_contents: {
+    columns: {
+      id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+      analysis_id: "INTEGER NOT NULL UNIQUE",
+      article_text: "TEXT NOT NULL",
+      narrator_voice: "TEXT DEFAULT ''",
+      created_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
+    },
+  },
+  audio_segments: {
+    columns: {
+      id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+      analysis_id: "INTEGER NOT NULL",
+      segment_index: "INTEGER NOT NULL",
+      character_name: "TEXT NOT NULL DEFAULT ''",
       character_id: "TEXT NOT NULL DEFAULT ''",
+      segment_type: "TEXT NOT NULL DEFAULT 'narration'",
+      text: "TEXT NOT NULL",
       voice_description: "TEXT DEFAULT ''",
       style_instruction: "TEXT DEFAULT ''",
       audio_file_key: "TEXT DEFAULT ''",
       duration: "INTEGER DEFAULT 0",
+      created_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
     },
-    users: {
-      avatar_url: "TEXT DEFAULT ''",
-      updated_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
+  },
+  usage_records: {
+    columns: {
+      id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+      identifier: "TEXT NOT NULL",
+      user_id: "INTEGER",
+      action: "TEXT NOT NULL",
+      ip_address: "TEXT DEFAULT ''",
+      created_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
     },
-  };
+  },
+};
 
-  for (const [tableName, expectedCols] of Object.entries(tableColumns)) {
+/**
+ * Check and add missing columns to existing tables
+ */
+async function migrateDB(db: D1Database): Promise<void> {
+  for (const [tableName, schema] of Object.entries(SCHEMA)) {
     try {
       const tableExists = await db.prepare(
         "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
       ).bind(tableName).first();
 
-      if (!tableExists) continue;
+      if (!tableExists) {
+        console.log(`[migrateDB] Table ${tableName} missing, will be created by initDB`);
+        continue;
+      }
 
       const { results: columns } = await db.prepare(`PRAGMA table_info(${tableName})`).all();
-      const existingCols = columns.map((col: Record<string, unknown>) => col.name);
+      const existingCols = new Set(columns.map((col: Record<string, unknown>) => col.name));
 
-      for (const [colName, colType] of Object.entries(expectedCols)) {
-        if (!existingCols.includes(colName)) {
+      for (const [colName, colType] of Object.entries(schema.columns)) {
+        if (!existingCols.has(colName)) {
           console.log(`[migrateDB] Adding ${tableName}.${colName}`);
           await db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${colName} ${colType}`).run()
             .catch((e: unknown) => {
-              console.warn(`[migrateDB] ${colName} skip:`, (e as Error)?.message);
+              console.warn(`[migrateDB] ${tableName}.${colName} skip:`, (e as Error)?.message);
             });
         }
       }
@@ -204,6 +250,7 @@ export async function getDBWithMigration(): Promise<D1Database> {
       await initDB(db);
       await migrateDB(db);
       _migrationDone.add("default");
+      console.log("[getDBWithMigration] Schema initialized and migrated");
     } catch (error: unknown) {
       console.warn("[getDBWithMigration] DB init failed:", (error as Error)?.message);
     }
