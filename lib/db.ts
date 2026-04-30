@@ -112,6 +112,18 @@ export async function initDB(db: D1Database): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_generation_records_user_id ON generation_records(user_id);
     CREATE INDEX IF NOT EXISTS idx_generation_records_created_at ON generation_records(created_at);
+
+    CREATE TABLE IF NOT EXISTS usage_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      identifier TEXT NOT NULL,
+      user_id INTEGER,
+      action TEXT NOT NULL,
+      ip_address TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_usage_records_identifier ON usage_records(identifier);
+    CREATE INDEX IF NOT EXISTS idx_usage_records_created_at ON usage_records(created_at);
   `);
 }
 

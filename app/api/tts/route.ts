@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ttsCompletion } from "@/lib/mimo-client";
-import { getServerConfig } from "@/lib/config";
+import { getServerConfig, isServerMode } from "@/lib/config";
 import { splitTextForTTS } from "@/lib/text-splitter";
+import { getDBWithMigration } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
+import { checkRateLimit, recordUsage, getClientIp } from "@/lib/rate-limit";
 import type { TTSModel, ArticleSegment } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
@@ -15,8 +18,6 @@ export async function POST(request: NextRequest) {
         effectiveModel?: TTSModel;
       };
     const serverConfig = getServerConfig();
-
-    // Always use server-side API key, never from request
     const apiKey = serverConfig.apiKey;
     const finalBaseUrl = serverConfig.baseUrl || baseUrl;
 
@@ -27,10 +28,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const serverMode = isServerMode();
+    let rateLimitInfo = null;
+
+    // Rate limiting only in server mode
+    if (serverMode) {
+      const db = await getDBWithMigration();
+      const cookieHeader = request.headers.get("cookie");
+      const user = await getCurrentUser(db, cookieHeader);
+      const ip = getClientIp(request);
+      const identifier = user ? `user:${user.id}` : `ip:${ip}`;
+
+      const rateLimit = await checkRateLimit(db, identifier, !!user);
+
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error: "今日使用次数已用完，请登录后继续使用",
+            rateLimit: {
+              used: rateLimit.used,
+              remaining: rateLimit.remaining,
+              limit: 5,
+            },
+          },
+          { status: 429 }
+        );
+      }
+
+      await recordUsage(db, identifier, user?.id || null, "tts", ip);
+
+      rateLimitInfo = {
+        used: rateLimit.used + 1,
+        remaining: rateLimit.remaining - 1,
+        limit: 5,
+      };
+    }
+
     const useModel = effectiveModel || model;
     const textChunks = splitTextForTTS(segment.text);
 
-    // If text fits in one chunk, generate directly
     if (textChunks.length === 1) {
       const audioBase64 = await ttsCompletion(
         apiKey,
@@ -52,12 +88,13 @@ export async function POST(request: NextRequest) {
         finalBaseUrl
       );
 
-      return NextResponse.json({ audioBase64 });
+      return NextResponse.json({
+        audioBase64,
+        ...(rateLimitInfo && { rateLimit: rateLimitInfo }),
+      });
     }
 
-    // For long text, generate each chunk and concatenate
     const audioChunks: string[] = [];
-
     for (const chunk of textChunks) {
       const audioBase64 = await ttsCompletion(
         apiKey,
@@ -78,14 +115,13 @@ export async function POST(request: NextRequest) {
         },
         finalBaseUrl
       );
-
       audioChunks.push(audioBase64);
     }
 
-    // Simple concatenation: merge all base64 audio data
-    const mergedAudio = mergeWavBase64(audioChunks);
-
-    return NextResponse.json({ audioBase64: mergedAudio });
+    return NextResponse.json({
+      audioBase64: mergeWavBase64(audioChunks),
+      ...(rateLimitInfo && { rateLimit: rateLimitInfo }),
+    });
   } catch (error) {
     console.error("TTS error:", error);
     return NextResponse.json(
@@ -95,9 +131,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Merge multiple WAV base64 strings into one.
- */
 function mergeWavBase64(chunks: string[]): string {
   if (chunks.length === 0) return "";
   if (chunks.length === 1) return chunks[0];
@@ -105,9 +138,7 @@ function mergeWavBase64(chunks: string[]): string {
   const decodedChunks = chunks.map((b64) => {
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return bytes;
   });
 
@@ -121,19 +152,12 @@ function mergeWavBase64(chunks: string[]): string {
   for (const chunk of decodedChunks) {
     let dataStart = -1;
     for (let i = 0; i < chunk.length - 4; i++) {
-      if (
-        chunk[i] === 0x64 &&
-        chunk[i + 1] === 0x61 &&
-        chunk[i + 2] === 0x74 &&
-        chunk[i + 3] === 0x61
-      ) {
+      if (chunk[i] === 0x64 && chunk[i + 1] === 0x61 && chunk[i + 2] === 0x74 && chunk[i + 3] === 0x61) {
         dataStart = i + 8;
         break;
       }
     }
-    if (dataStart > 0) {
-      allPcmData.push(chunk.slice(dataStart));
-    }
+    if (dataStart > 0) allPcmData.push(chunk.slice(dataStart));
   }
 
   const totalPcmSize = allPcmData.reduce((sum, data) => sum + data.length, 0);
@@ -141,7 +165,6 @@ function mergeWavBase64(chunks: string[]): string {
   const totalSize = headerSize + totalPcmSize;
   const merged = new Uint8Array(totalSize);
 
-  // WAV header
   merged[0] = 0x52; merged[1] = 0x49; merged[2] = 0x46; merged[3] = 0x46;
   merged[4] = (totalSize - 8) & 0xff; merged[5] = ((totalSize - 8) >> 8) & 0xff;
   merged[6] = ((totalSize - 8) >> 16) & 0xff; merged[7] = ((totalSize - 8) >> 24) & 0xff;
@@ -167,8 +190,6 @@ function mergeWavBase64(chunks: string[]): string {
   }
 
   let binary = "";
-  for (let i = 0; i < merged.length; i++) {
-    binary += String.fromCharCode(merged[i]);
-  }
+  for (let i = 0; i < merged.length; i++) binary += String.fromCharCode(merged[i]);
   return btoa(binary);
 }
