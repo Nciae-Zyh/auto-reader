@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDBWithMigration } from "@/lib/db";
 import { isServerMode } from "@/lib/config";
+import { getCurrentUser } from "@/lib/auth";
 import { getAudioAsBase64 } from "@/lib/storage";
 
 export async function GET(
@@ -13,12 +14,18 @@ export async function GET(
 
   try {
     const { id } = await params;
+    const cookieHeader = request.headers.get("cookie");
     const db = await getDBWithMigration();
+    const user = await getCurrentUser(db, cookieHeader);
 
-    // Get analysis record
-    const analysis = await db.prepare("SELECT * FROM analysis_records WHERE id = ?")
-      .bind(parseInt(id))
-      .first();
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    // Get analysis record - only if owned by user
+    const analysis = await db.prepare(
+      "SELECT * FROM analysis_records WHERE id = ? AND user_id = ?"
+    ).bind(parseInt(id), user.id).first();
 
     if (!analysis) {
       return NextResponse.json({ error: "Analysis not found" }, { status: 404 });

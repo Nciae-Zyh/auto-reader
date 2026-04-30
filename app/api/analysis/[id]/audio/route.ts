@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDBWithMigration } from "@/lib/db";
 import { isServerMode } from "@/lib/config";
+import { getCurrentUser } from "@/lib/auth";
 import { getAudio } from "@/lib/storage";
 
 export async function GET(
@@ -15,10 +16,24 @@ export async function GET(
     const { id } = await params;
     const url = new URL(request.url);
     const segmentIndex = url.searchParams.get("segment");
+    const cookieHeader = request.headers.get("cookie");
     const db = await getDBWithMigration();
+    const user = await getCurrentUser(db, cookieHeader);
+
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    // Verify user owns this analysis
+    const ownership = await db.prepare(
+      "SELECT id FROM analysis_records WHERE id = ? AND user_id = ?"
+    ).bind(parseInt(id), user.id).first();
+
+    if (!ownership) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
 
     if (segmentIndex !== null) {
-      // Get specific segment audio
       const segment = await db.prepare(
         "SELECT audio_file_key, text FROM audio_segments WHERE analysis_id = ? AND segment_index = ?"
       ).bind(parseInt(id), parseInt(segmentIndex)).first<{ audio_file_key: string; text: string }>();
@@ -36,7 +51,6 @@ export async function GET(
         headers: { "Content-Type": "audio/wav", "Content-Disposition": `attachment; filename="segment_${segmentIndex}.wav"` },
       });
     } else {
-      // Get merged audio
       const analysis = await db.prepare("SELECT merged_audio_key, title FROM analysis_records WHERE id = ?")
         .bind(parseInt(id)).first<{ merged_audio_key: string; title: string }>();
 
