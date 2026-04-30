@@ -21,14 +21,16 @@ export async function POST(request: NextRequest) {
 
     const serverMode = isServerMode();
     let rateLimitInfo = null;
+    let userId: number | null = null;
 
-    // Rate limiting only in server mode
+    // Server mode: check rate limit and get user
     if (serverMode) {
       const db = await getDBWithMigration();
       const cookieHeader = request.headers.get("cookie");
       const user = await getCurrentUser(db, cookieHeader);
+      userId = user?.id || null;
       const ip = getClientIp(request);
-      const identifier = user ? `user:${user.id}` : `ip:${ip}`;
+      const identifier = userId ? `user:${userId}` : `ip:${ip}`;
 
       const rateLimit = await checkRateLimit(db, identifier, !!user);
 
@@ -36,17 +38,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error: "今日使用次数已用完，请登录后继续使用",
-            rateLimit: {
-              used: rateLimit.used,
-              remaining: rateLimit.remaining,
-              limit: 5,
-            },
+            rateLimit: { used: rateLimit.used, remaining: rateLimit.remaining, limit: 5 },
           },
           { status: 429 }
         );
       }
 
-      await recordUsage(db, identifier, user?.id || null, "analyze", ip);
+      await recordUsage(db, identifier, userId, "analyze", ip);
 
       rateLimitInfo = {
         used: rateLimit.used + 1,
@@ -55,9 +53,54 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    // Analyze article
     const result = await analyzeArticle(article, apiKey, finalBaseUrl);
+
+    // Save analysis to database if in server mode
+    let analysisId: number | null = null;
+    if (serverMode) {
+      const db = await getDBWithMigration();
+
+      // Insert analysis record
+      const insertResult = await db.prepare(`
+        INSERT INTO analysis_records (user_id, title, summary, article_text, narrator_voice, reading_mode, tts_model, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'analyzed')
+      `).bind(
+        userId,
+        result.title || "",
+        result.summary || "",
+        article,
+        result.narratorVoice || "",
+        "ai",
+        "mimo-v2.5-tts-voicedesign"
+      ).run();
+
+      analysisId = insertResult.meta.last_row_id;
+
+      // Insert segments
+      if (result.segments && Array.isArray(result.segments)) {
+        for (let i = 0; i < result.segments.length; i++) {
+          const seg = result.segments[i];
+          await db.prepare(`
+            INSERT INTO audio_segments (analysis_id, segment_index, character_name, character_id, type, text, voice_description, style_instruction)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            analysisId,
+            i,
+            seg.character || "",
+            seg.characterId || "",
+            seg.type || "narration",
+            seg.text || "",
+            seg.voiceDescription || "",
+            seg.styleInstruction || ""
+          ).run();
+        }
+      }
+    }
+
     return NextResponse.json({
       ...result,
+      analysisId,
       ...(rateLimitInfo && { rateLimit: rateLimitInfo }),
     });
   } catch (error) {

@@ -5,17 +5,20 @@ import { splitTextForTTS } from "@/lib/text-splitter";
 import { getDBWithMigration } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { checkRateLimit, recordUsage, getClientIp } from "@/lib/rate-limit";
+import { saveAudioFromBase64, generateAudioKey } from "@/lib/storage";
 import type { TTSModel, ArticleSegment } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   try {
-    const { segment, model, baseUrl, referenceAudio, effectiveModel } =
+    const { segment, model, baseUrl, referenceAudio, effectiveModel, analysisId, segmentIndex } =
       (await request.json()) as {
         segment: ArticleSegment;
         model: TTSModel;
         baseUrl?: string;
         referenceAudio?: string;
         effectiveModel?: TTSModel;
+        analysisId?: number;
+        segmentIndex?: number;
       };
     const serverConfig = getServerConfig();
     const apiKey = serverConfig.apiKey;
@@ -30,14 +33,16 @@ export async function POST(request: NextRequest) {
 
     const serverMode = isServerMode();
     let rateLimitInfo = null;
+    let userId: number | null = null;
 
     // Rate limiting only in server mode
     if (serverMode) {
       const db = await getDBWithMigration();
       const cookieHeader = request.headers.get("cookie");
       const user = await getCurrentUser(db, cookieHeader);
+      userId = user?.id || null;
       const ip = getClientIp(request);
-      const identifier = user ? `user:${user.id}` : `ip:${ip}`;
+      const identifier = userId ? `user:${userId}` : `ip:${ip}`;
 
       const rateLimit = await checkRateLimit(db, identifier, !!user);
 
@@ -45,17 +50,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error: "今日使用次数已用完，请登录后继续使用",
-            rateLimit: {
-              used: rateLimit.used,
-              remaining: rateLimit.remaining,
-              limit: 5,
-            },
+            rateLimit: { used: rateLimit.used, remaining: rateLimit.remaining, limit: 5 },
           },
           { status: 429 }
         );
       }
 
-      await recordUsage(db, identifier, user?.id || null, "tts", ip);
+      await recordUsage(db, identifier, userId, "tts", ip);
 
       rateLimitInfo = {
         used: rateLimit.used + 1,
@@ -66,60 +67,68 @@ export async function POST(request: NextRequest) {
 
     const useModel = effectiveModel || model;
     const textChunks = splitTextForTTS(segment.text);
+    let audioBase64: string;
 
     if (textChunks.length === 1) {
-      const audioBase64 = await ttsCompletion(
+      audioBase64 = await ttsCompletion(
         apiKey,
         useModel,
         {
           text: segment.text,
-          voiceDescription:
-            useModel === "mimo-v2.5-tts-voicedesign"
-              ? segment.voiceDescription
-              : undefined,
-          styleInstruction:
-            useModel !== "mimo-v2.5-tts-voicedesign"
-              ? segment.styleInstruction
-              : undefined,
-          referenceAudio:
-            useModel === "mimo-v2.5-tts-voiceclone" ? referenceAudio : undefined,
+          voiceDescription: useModel === "mimo-v2.5-tts-voicedesign" ? segment.voiceDescription : undefined,
+          styleInstruction: useModel !== "mimo-v2.5-tts-voicedesign" ? segment.styleInstruction : undefined,
+          referenceAudio: useModel === "mimo-v2.5-tts-voiceclone" ? referenceAudio : undefined,
           format: "wav",
         },
         finalBaseUrl
       );
-
-      return NextResponse.json({
-        audioBase64,
-        ...(rateLimitInfo && { rateLimit: rateLimitInfo }),
-      });
+    } else {
+      const audioChunks: string[] = [];
+      for (const chunk of textChunks) {
+        const chunkAudio = await ttsCompletion(
+          apiKey,
+          useModel,
+          {
+            text: chunk,
+            voiceDescription: useModel === "mimo-v2.5-tts-voicedesign" ? segment.voiceDescription : undefined,
+            styleInstruction: useModel !== "mimo-v2.5-tts-voicedesign" ? segment.styleInstruction : undefined,
+            referenceAudio: useModel === "mimo-v2.5-tts-voiceclone" ? referenceAudio : undefined,
+            format: "wav",
+          },
+          finalBaseUrl
+        );
+        audioChunks.push(chunkAudio);
+      }
+      audioBase64 = mergeWavBase64(audioChunks);
     }
 
-    const audioChunks: string[] = [];
-    for (const chunk of textChunks) {
-      const audioBase64 = await ttsCompletion(
-        apiKey,
-        useModel,
-        {
-          text: chunk,
-          voiceDescription:
-            useModel === "mimo-v2.5-tts-voicedesign"
-              ? segment.voiceDescription
-              : undefined,
-          styleInstruction:
-            useModel !== "mimo-v2.5-tts-voicedesign"
-              ? segment.styleInstruction
-              : undefined,
-          referenceAudio:
-            useModel === "mimo-v2.5-tts-voiceclone" ? referenceAudio : undefined,
-          format: "wav",
-        },
-        finalBaseUrl
-      );
-      audioChunks.push(audioBase64);
+    // Save audio to storage and update database in server mode
+    if (serverMode && analysisId !== undefined && segmentIndex !== undefined) {
+      try {
+        const db = await getDBWithMigration();
+
+        // Get analysis to find user_id
+        const analysis = await db.prepare("SELECT user_id FROM analysis_records WHERE id = ?")
+          .bind(analysisId)
+          .first<{ user_id: number }>();
+
+        const uid = analysis?.user_id || userId || 0;
+        const key = generateAudioKey(uid, analysisId, segmentIndex);
+
+        // Save to storage
+        await saveAudioFromBase64(undefined, key, audioBase64);
+
+        // Update database
+        await db.prepare("UPDATE audio_segments SET audio_file_key = ? WHERE analysis_id = ? AND segment_index = ?")
+          .bind(key, analysisId, segmentIndex).run();
+      } catch (saveError) {
+        console.error("Save audio error:", saveError);
+        // Don't fail the request, just log the error
+      }
     }
 
     return NextResponse.json({
-      audioBase64: mergeWavBase64(audioChunks),
+      audioBase64,
       ...(rateLimitInfo && { rateLimit: rateLimitInfo }),
     });
   } catch (error) {

@@ -18,14 +18,31 @@ export default function Header() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { locale, setLocale, t } = useI18n();
   const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
+    setAuthLoading(true);
     fetch("/api/auth/me")
       .then((res) => res.json())
-      .then((data) => setUser(data.user))
-      .catch(() => {});
+      .then((data) => {
+        setUser(data.user);
+        setAuthLoading(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setAuthLoading(false);
+      });
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClick = () => setShowDropdown(false);
+    if (showDropdown) {
+      document.addEventListener("click", handleClick);
+      return () => document.removeEventListener("click", handleClick);
+    }
+  }, [showDropdown]);
 
   const cycleTheme = () => {
     const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
@@ -98,11 +115,6 @@ export default function Header() {
           <button
             onClick={cycleTheme}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            title={
-              resolvedTheme === "dark"
-                ? "Switch to light mode"
-                : "Switch to dark mode"
-            }
           >
             {resolvedTheme === "dark" ? (
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -123,19 +135,20 @@ export default function Header() {
             )}
           </button>
 
-          {/* User menu */}
-          {user ? (
+          {/* User menu / Login button */}
+          {authLoading ? (
+            <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700" />
+          ) : user ? (
             <div className="relative">
               <button
-                onClick={() => setShowDropdown(!showDropdown)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDropdown(!showDropdown);
+                }}
                 className="flex items-center gap-2"
               >
                 {user.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt={user.name}
-                    className="h-8 w-8 rounded-full"
-                  />
+                  <img src={user.avatar_url} alt={user.name} className="h-8 w-8 rounded-full" />
                 ) : (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-600 dark:bg-blue-900 dark:text-blue-400">
                     {user.name?.charAt(0) || user.email?.charAt(0)}
@@ -145,12 +158,8 @@ export default function Header() {
               {showDropdown && (
                 <div className="absolute right-0 top-10 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                   <div className="border-b border-gray-100 px-4 py-2 dark:border-gray-700">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {user.name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {user.email}
-                    </p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
                   </div>
                   <button
                     onClick={handleLogout}
