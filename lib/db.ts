@@ -4,13 +4,6 @@ import type { D1Database, D1PreparedStatement, D1Result, CloudflareEnv } from ".
 let localDb: D1Database | null = null;
 
 /**
- * Get D1 database from Cloudflare environment
- */
-export function getD1FromEnv(env: CloudflareEnv): D1Database | undefined {
-  return env?.DB;
-}
-
-/**
  * Create a D1-compatible wrapper around better-sqlite3 for local development
  */
 async function createLocalDb(): Promise<D1Database> {
@@ -20,7 +13,7 @@ async function createLocalDb(): Promise<D1Database> {
   const Database = (await import("better-sqlite3")).default;
   const sqlite = new Database(".data/local.sqlite");
 
-  // Enable WAL mode for better concurrent access
+  // Enable WAL mode
   sqlite.pragma("journal_mode = WAL");
 
   const makeStmt = (
@@ -71,10 +64,17 @@ async function createLocalDb(): Promise<D1Database> {
 /**
  * Get database - tries Cloudflare D1 first, falls back to local SQLite
  */
-export async function getDB(env?: CloudflareEnv): Promise<D1Database> {
-  // Try Cloudflare D1 first
-  if (env?.DB) {
-    return env.DB;
+export async function getDB(): Promise<D1Database> {
+  // Try Cloudflare D1 via OpenNext context
+  try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const { env } = getCloudflareContext();
+    const d1 = (env as Record<string, unknown>)?.DB as D1Database | undefined;
+    if (d1) {
+      return d1;
+    }
+  } catch {
+    // Not in Cloudflare environment, use local SQLite
   }
 
   // Fall back to local SQLite
@@ -133,8 +133,8 @@ let migrationDone = false;
 /**
  * Get database with auto-migration
  */
-export async function getDBWithMigration(env?: CloudflareEnv): Promise<D1Database> {
-  const db = await getDB(env);
+export async function getDBWithMigration(): Promise<D1Database> {
+  const db = await getDB();
 
   if (!migrationDone) {
     await initDB(db);
