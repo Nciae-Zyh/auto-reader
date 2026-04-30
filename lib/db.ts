@@ -1,15 +1,19 @@
 import type { D1Database, D1PreparedStatement, D1Result, CloudflareEnv } from "./db-types";
 
-// Singleton for local SQLite
+// Singleton for local SQLite (only used in development)
 let localDb: D1Database | null = null;
 
 /**
- * Create a D1-compatible wrapper around better-sqlite3 for local development
+ * Create a D1-compatible wrapper around better-sqlite3 for LOCAL development only
  */
 async function createLocalDb(): Promise<D1Database> {
   if (localDb) return localDb;
 
-  // Dynamic import - will be tree-shaken in production
+  // Only import better-sqlite3 in Node.js environment (development)
+  if (typeof globalThis.navigator !== "undefined") {
+    throw new Error("Local SQLite not available in browser environment");
+  }
+
   const Database = (await import("better-sqlite3")).default;
   const sqlite = new Database(".data/local.sqlite");
 
@@ -62,7 +66,7 @@ async function createLocalDb(): Promise<D1Database> {
 }
 
 /**
- * Get database - tries Cloudflare D1 first, falls back to local SQLite
+ * Get database - Cloudflare D1 in production, local SQLite in development
  */
 export async function getDB(): Promise<D1Database> {
   // Try Cloudflare D1 via OpenNext context
@@ -74,11 +78,15 @@ export async function getDB(): Promise<D1Database> {
       return d1;
     }
   } catch {
-    // Not in Cloudflare environment, use local SQLite
+    // Not in Cloudflare environment
   }
 
-  // Fall back to local SQLite
-  return createLocalDb();
+  // Only use local SQLite in development (not in Cloudflare Workers)
+  if (process.env.NODE_ENV === "development" || !globalThis.caches) {
+    return createLocalDb();
+  }
+
+  throw new Error("Database not available. Please configure D1 binding in wrangler.jsonc");
 }
 
 /**
