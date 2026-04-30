@@ -23,6 +23,7 @@ export default function Home() {
   const [characterAudios, setCharacterAudios] = useState<Map<string, string>>(new Map());
   const [readingMode, setReadingMode] = useState<ReadingMode>("ai");
   const [personalVoice, setPersonalVoice] = useState<string>("");
+  const [visibleSegments, setVisibleSegments] = useState(10);
 
   const { settings, baseUrl, mounted, serverMode, hasApiKey } = useSettings();
   const { t } = useI18n();
@@ -376,7 +377,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-4">
-            {segments.map((segment, index) => (
+            {segments.slice(0, visibleSegments).map((segment, index) => (
               <SegmentCard
                 key={segment.id}
                 segment={segment}
@@ -392,6 +393,17 @@ export default function Home() {
               />
             ))}
           </div>
+
+          {segments.length > visibleSegments && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setVisibleSegments((v) => v + 10)}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Show More ({segments.length - visibleSegments} remaining)
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

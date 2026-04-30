@@ -2,6 +2,8 @@
 
 AI-powered article analysis and voice reading with MiMo. Automatically identifies characters and narration in articles, generates appropriate voices, and creates audio readings.
 
+**Demo**: https://auto-reader.sparkles-editor.com/
+
 ## Features
 
 - **AI Smart Mode**: Automatically assigns different voices to different characters
@@ -13,6 +15,7 @@ AI-powered article analysis and voice reading with MiMo. Automatically identifie
 - **Long Text Support**: Automatic text splitting for articles over 2500 characters
 - **Audio Download**: Merge and download complete audio files
 - **History**: Save and download your generation history
+- **Rate Limiting**: 5 free analyses per day for anonymous users, unlimited for logged-in users
 
 ## Tech Stack
 
@@ -21,6 +24,7 @@ AI-powered article analysis and voice reading with MiMo. Automatically identifie
 - **Database**: Cloudflare D1 / SQLite (local)
 - **Storage**: Cloudflare R2 / Local filesystem
 - **TTS**: MiMo V2.5 TTS API
+- **Auth**: Google OAuth 2.0
 
 ## Quick Start
 
@@ -158,8 +162,8 @@ The app will automatically use SQLite for database and local filesystem for stor
 | `MIMO_API_KEY` | Yes | Your MiMo API key |
 | `MIMO_BASE_URL` | No | API base URL (default: https://api.xiaomimimo.com/v1) |
 | `MIMO_TTS_MODEL` | No | Default TTS model |
-| `SERVER_MODE` | No | Set to `true` to enable server mode (D1/R2/Google Auth) |
-| `GOOGLE_CLIENT_ID` | For auth | Google OAuth client ID |
+| `NEXT_PUBLIC_SERVER_MODE` | No | Set to `true` to enable server mode (D1/R2/Google Auth) |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | For auth | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | For auth | Google OAuth client secret |
 
 ### TTS Models
@@ -182,6 +186,7 @@ auto-reader/
 │   │   └── tts/              # Text-to-speech endpoint
 │   ├── history/              # History page
 │   ├── settings/             # Settings page
+│   ├── login/                # Login page
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/               # React components
@@ -190,6 +195,7 @@ auto-reader/
 │   ├── db.ts                 # Database utilities (D1/SQLite)
 │   ├── i18n.ts               # Internationalization
 │   ├── storage.ts            # File storage (R2/local)
+│   ├── mimo-client.ts        # MiMo API client with retry
 │   └── types.ts              # TypeScript types
 ├── wrangler.jsonc            # Cloudflare Workers config
 ├── open-next.config.ts       # OpenNext config

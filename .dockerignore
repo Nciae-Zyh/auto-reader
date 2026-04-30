@@ -1,0 +1,10 @@
+node_modules
+.next
+.open-next
+.git
+.github
+.env
+.env.local
+*.md
+.wrangler
+.data

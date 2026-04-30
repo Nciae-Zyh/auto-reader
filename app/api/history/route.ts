@@ -13,29 +13,35 @@ export async function GET(request: NextRequest) {
     }
 
     const url = new URL(request.url);
-    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const limit = Math.min(parseInt(url.searchParams.get("limit") || "20"), 100);
     const offset = parseInt(url.searchParams.get("offset") || "0");
+    const search = url.searchParams.get("search") || "";
 
-    // Query analysis records for this user
-    const { results: records } = await db.prepare(`
-      SELECT ar.*, ac.article_text
-      FROM analysis_records ar
-      LEFT JOIN article_contents ac ON ac.analysis_id = ar.id
-      WHERE ar.user_id = ?
-      ORDER BY ar.created_at DESC
-      LIMIT ? OFFSET ?
-    `).bind(user.id, limit, offset).all();
+    let query = "SELECT ar.* FROM analysis_records ar WHERE ar.user_id = ?";
+    let countQuery = "SELECT COUNT(*) as count FROM analysis_records WHERE user_id = ?";
+    const params: unknown[] = [user.id];
+    const countParams: unknown[] = [user.id];
 
-    // Get total count
-    const total = await db.prepare(
-      "SELECT COUNT(*) as count FROM analysis_records WHERE user_id = ?"
-    ).bind(user.id).first<{ count: number }>();
+    if (search) {
+      query += " AND (ar.title LIKE ? OR ar.summary LIKE ?)";
+      countQuery += " AND (ar.title LIKE ? OR ar.summary LIKE ?)";
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm);
+      countParams.push(searchTerm, searchTerm);
+    }
+
+    query += " ORDER BY ar.created_at DESC LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+
+    const { results: records } = await db.prepare(query).bind(...params).all();
+    const total = await db.prepare(countQuery).bind(...countParams).first<{ count: number }>();
 
     return NextResponse.json({
       records,
       total: total?.count || 0,
       limit,
       offset,
+      hasMore: offset + limit < (total?.count || 0),
     });
   } catch (error) {
     console.error("Get history error:", error);

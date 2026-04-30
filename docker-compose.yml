@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  auto-reader:
+    build: .
+    container_name: auto-reader
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MIMO_API_KEY=${MIMO_API_KEY}
+      - MIMO_BASE_URL=${MIMO_BASE_URL:-https://api.xiaomimimo.com/v1}
+      - MIMO_TTS_MODEL=${MIMO_TTS_MODEL:-mimo-v2.5-tts-voicedesign}
+      - NEXT_PUBLIC_SERVER_MODE=true
+      - BACKGROUND_WORKER=true
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+    volumes:
+      - auto-reader-data:/app/.data
+    restart: unless-stopped
+
+  # Optional: Background worker for processing tasks
+  auto-reader-worker:
+    build: .
+    container_name: auto-reader-worker
+    command: ["node", "worker.js"]
+    environment:
+      - NODE_ENV=production
+      - BACKGROUND_WORKER=true
+      - MIMO_API_KEY=${MIMO_API_KEY}
+      - MIMO_BASE_URL=${MIMO_BASE_URL:-https://api.xiaomimimo.com/v1}
+      - MIMO_TTS_MODEL=${MIMO_TTS_MODEL:-mimo-v2.5-tts-voicedesign}
+    volumes:
+      - auto-reader-data:/app/.data
+    restart: unless-stopped
+    profiles:
+      - worker
+
+volumes:
+  auto-reader-data:
+    driver: local
