@@ -16,5 +16,11 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "auto-reader"
     }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "auto-reader-db"
+    }
   ]
 }
