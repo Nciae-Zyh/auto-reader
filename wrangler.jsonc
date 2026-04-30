@@ -25,5 +25,11 @@
       "binding": "DB",
       "database_name": "auto-reader-db"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIO_BUCKET",
+      "bucket_name": "auto-reader-audio"
+    }
   ]
 }

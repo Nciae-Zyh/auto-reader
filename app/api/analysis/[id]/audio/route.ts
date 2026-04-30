@@ -27,7 +27,7 @@ export async function GET(
         return NextResponse.json({ error: "Audio not found" }, { status: 404 });
       }
 
-      const audio = await getAudio(undefined, segment.audio_file_key);
+      const audio = await getAudio(segment.audio_file_key);
       if (!audio) {
         return NextResponse.json({ error: "Audio file not found" }, { status: 404 });
       }
@@ -44,7 +44,7 @@ export async function GET(
         return NextResponse.json({ error: "Merged audio not found" }, { status: 404 });
       }
 
-      const audio = await getAudio(undefined, analysis.merged_audio_key);
+      const audio = await getAudio(analysis.merged_audio_key);
       if (!audio) {
         return NextResponse.json({ error: "Audio file not found" }, { status: 404 });
       }

@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     if (audioBase64) {
       audioKey = generateAudioKey(user.id, recordId);
       const audioBuffer = Buffer.from(audioBase64, "base64");
-      await saveAudio(undefined, audioKey, audioBuffer);
+      await saveAudio(audioKey, audioBuffer);
     }
 
     return NextResponse.json({ recordId, audioKey });

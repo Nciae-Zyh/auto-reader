@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get audio from storage
-    const audio = await getAudio(undefined, record.audio_file_key);
+    const audio = await getAudio(record.audio_file_key);
 
     if (!audio) {
       return NextResponse.json(

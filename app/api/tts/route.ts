@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
         const key = generateAudioKey(uid, analysisId, segmentIndex);
 
         // Save to storage
-        await saveAudioFromBase64(undefined, key, audioBase64);
+        await saveAudioFromBase64(key, audioBase64);
 
         // Update database
         await db.prepare("UPDATE audio_segments SET audio_file_key = ? WHERE analysis_id = ? AND segment_index = ?")

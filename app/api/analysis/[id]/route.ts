@@ -33,7 +33,6 @@ export async function GET(
     let mergedAudioBase64 = null;
     if ((analysis as Record<string, unknown>).merged_audio_key) {
       mergedAudioBase64 = await getAudioAsBase64(
-        undefined,
         (analysis as Record<string, unknown>).merged_audio_key as string
       );
     }

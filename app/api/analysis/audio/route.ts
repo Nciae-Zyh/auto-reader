@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const key = generateAudioKey(userId, analysisId, isMerged ? undefined : segmentIndex);
 
     // Save audio to storage (R2 or local)
-    await saveAudioFromBase64(undefined, key, audioBase64);
+    await saveAudioFromBase64(key, audioBase64);
 
     if (isMerged) {
       // Update merged audio key
