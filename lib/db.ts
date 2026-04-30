@@ -146,6 +146,55 @@ export async function initDB(db: D1Database): Promise<void> {
   }
 }
 
+/**
+ * Check and add missing columns to existing tables
+ */
+async function migrateDB(db: D1Database): Promise<void> {
+  const tableColumns: Record<string, Record<string, string>> = {
+    analysis_records: {
+      ip_address: "TEXT DEFAULT ''",
+      total_duration: "INTEGER DEFAULT 0",
+      merged_audio_key: "TEXT DEFAULT ''",
+    },
+    audio_segments: {
+      character_id: "TEXT NOT NULL DEFAULT ''",
+      voice_description: "TEXT DEFAULT ''",
+      style_instruction: "TEXT DEFAULT ''",
+      audio_file_key: "TEXT DEFAULT ''",
+      duration: "INTEGER DEFAULT 0",
+    },
+    users: {
+      avatar_url: "TEXT DEFAULT ''",
+      updated_at: "DATETIME DEFAULT CURRENT_TIMESTAMP",
+    },
+  };
+
+  for (const [tableName, expectedCols] of Object.entries(tableColumns)) {
+    try {
+      const tableExists = await db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
+      ).bind(tableName).first();
+
+      if (!tableExists) continue;
+
+      const { results: columns } = await db.prepare(`PRAGMA table_info(${tableName})`).all();
+      const existingCols = columns.map((col: Record<string, unknown>) => col.name);
+
+      for (const [colName, colType] of Object.entries(expectedCols)) {
+        if (!existingCols.includes(colName)) {
+          console.log(`[migrateDB] Adding ${tableName}.${colName}`);
+          await db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${colName} ${colType}`).run()
+            .catch((e: unknown) => {
+              console.warn(`[migrateDB] ${colName} skip:`, (e as Error)?.message);
+            });
+        }
+      }
+    } catch (e: unknown) {
+      console.warn(`[migrateDB] ${tableName} check failed:`, (e as Error)?.message);
+    }
+  }
+}
+
 const _migrationDone = new Set<string>();
 
 export async function getDBWithMigration(): Promise<D1Database> {
@@ -153,6 +202,7 @@ export async function getDBWithMigration(): Promise<D1Database> {
   if (!_migrationDone.has("default")) {
     try {
       await initDB(db);
+      await migrateDB(db);
       _migrationDone.add("default");
     } catch (error: unknown) {
       console.warn("[getDBWithMigration] DB init failed:", (error as Error)?.message);
