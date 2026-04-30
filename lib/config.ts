@@ -19,6 +19,7 @@ export function isServerMode(): boolean {
       process.env.NEXT_PUBLIC_SERVER_MODE === "1"
     );
   }
+
   // Server-side
   return (
     process.env.NEXT_PUBLIC_SERVER_MODE === "true" ||
