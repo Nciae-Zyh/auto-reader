@@ -91,11 +91,12 @@ export async function getDB(): Promise<D1Database> {
 
 /**
  * Initialize database schema
- * D1 doesn't support multiple statements in exec(), so we execute one by one
+ * Uses db.prepare().run() for each statement (D1 pattern)
  */
 export async function initDB(db: D1Database): Promise<void> {
-  const statements = [
-    `CREATE TABLE IF NOT EXISTS users (
+  // Create tables one by one using prepare().run()
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       google_id TEXT UNIQUE NOT NULL,
       email TEXT NOT NULL,
@@ -103,8 +104,11 @@ export async function initDB(db: D1Database): Promise<void> {
       avatar_url TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS generation_records (
+    )
+  `).run();
+
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS generation_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       title TEXT NOT NULL DEFAULT '',
@@ -116,28 +120,37 @@ export async function initDB(db: D1Database): Promise<void> {
       segment_count INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_generation_records_user_id ON generation_records(user_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_generation_records_created_at ON generation_records(created_at)`,
-    `CREATE TABLE IF NOT EXISTS usage_records (
+    )
+  `).run();
+
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS usage_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       identifier TEXT NOT NULL,
       user_id INTEGER,
       action TEXT NOT NULL,
       ip_address TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_usage_records_identifier ON usage_records(identifier)`,
-    `CREATE INDEX IF NOT EXISTS idx_usage_records_created_at ON usage_records(created_at)`,
+    )
+  `).run();
+
+  // Create indexes one by one, swallowing errors (IF NOT EXISTS)
+  const indexes = [
+    "CREATE INDEX IF NOT EXISTS idx_generation_records_user_id ON generation_records(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_generation_records_created_at ON generation_records(created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_usage_records_identifier ON usage_records(identifier)",
+    "CREATE INDEX IF NOT EXISTS idx_usage_records_created_at ON usage_records(created_at)",
   ];
 
-  for (const sql of statements) {
-    await db.exec(sql);
+  for (const sql of indexes) {
+    await db.prepare(sql).run().catch((e: unknown) => {
+      console.warn("[initDB] Index skipped:", (e as Error)?.message);
+    });
   }
 }
 
 // Track migration state
-let migrationDone = false;
+const _migrationDone = new Set<string>();
 
 /**
  * Get database with auto-migration
@@ -145,9 +158,13 @@ let migrationDone = false;
 export async function getDBWithMigration(): Promise<D1Database> {
   const db = await getDB();
 
-  if (!migrationDone) {
-    await initDB(db);
-    migrationDone = true;
+  if (!_migrationDone.has("default")) {
+    try {
+      await initDB(db);
+      _migrationDone.add("default");
+    } catch (error: unknown) {
+      console.warn("[getDBWithMigration] DB init failed:", (error as Error)?.message);
+    }
   }
 
   return db;
