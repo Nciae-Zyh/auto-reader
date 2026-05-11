@@ -15,26 +15,30 @@ export async function POST(request: NextRequest) {
 
     // Insert analysis record
     const result = await db.prepare(`
-      INSERT INTO analysis_records (user_id, title, summary, article_text, narrator_voice, reading_mode, tts_model, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'analyzed')
+      INSERT INTO analysis_records (user_id, title, summary, segment_count, reading_mode, tts_model, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'analyzed')
     `).bind(
       userId || null,
       title || "",
       summary || "",
-      articleText || "",
-      narratorVoice || "",
+      Array.isArray(segments) ? segments.length : 0,
       readingMode || "ai",
       ttsModel || "mimo-v2.5-tts-voicedesign"
     ).run();
 
     const analysisId = result.meta.last_row_id;
 
+    await db.prepare(`
+      INSERT INTO article_contents (analysis_id, article_text, narrator_voice)
+      VALUES (?, ?, ?)
+    `).bind(analysisId, articleText || "", narratorVoice || "").run();
+
     // Insert segments
     if (segments && Array.isArray(segments)) {
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
         await db.prepare(`
-          INSERT INTO audio_segments (analysis_id, segment_index, character_name, character_id, type, text, voice_description, style_instruction)
+          INSERT INTO audio_segments (analysis_id, segment_index, character_name, character_id, segment_type, text, voice_description, style_instruction)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           analysisId,

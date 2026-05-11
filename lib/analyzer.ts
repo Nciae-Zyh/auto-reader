@@ -1,4 +1,5 @@
 import { chatCompletion } from "./mimo-client";
+import { splitArticleForAnalysis } from "./long-text";
 import type { ArticleSegment, AnalysisResult } from "./types";
 
 const ANALYSIS_PROMPT = `你是一位专业的有声书导演和音色设计师。你的任务是分析用户提供的文章，将其拆分为适合朗读的段落，并为每个段落设计合适的音色。
@@ -70,11 +71,22 @@ const ANALYSIS_PROMPT = `你是一位专业的有声书导演和音色设计师�
 
 再次强调：对话标签（他说、她问道等）必须归入旁白段落，不能放在对话段落中！`;
 
+const CONTINUATION_PROMPT = `${ANALYSIS_PROMPT}
+
+这是长文本分块分析任务。你现在只分析用户给出的当前文本块，但必须沿用已知角色的 characterId、name、voiceDescription。
+如果当前块出现已知角色，必须复用完全相同的 characterId 和 voiceDescription。
+如果出现新角色，可以新增 characterId。不要总结或改写前后块，不要输出当前块之外的段落。`;
+
 export async function analyzeArticle(
   article: string,
   apiKey: string,
   baseUrl?: string
 ): Promise<AnalysisResult> {
+  const chunks = splitArticleForAnalysis(article);
+  if (chunks.length > 1) {
+    return analyzeLongArticle(article, apiKey, baseUrl);
+  }
+
   const content = await chatCompletion(
     apiKey,
     "mimo-v2.5",
@@ -86,12 +98,69 @@ export async function analyzeArticle(
     baseUrl
   );
 
-  const result = JSON.parse(content);
+  return normalizeAnalysisResult(JSON.parse(content));
+}
+
+export async function analyzeLongArticle(
+  article: string,
+  apiKey: string,
+  baseUrl?: string
+): Promise<AnalysisResult> {
+  const chunks = splitArticleForAnalysis(article);
+  const merged: AnalysisResult = {
+    title: "",
+    summary: "",
+    narratorVoice: "",
+    characters: {},
+    segments: [],
+  };
+
+  for (const chunk of chunks) {
+    const knownCharacters = buildCharacterContext(merged);
+    const content = await chatCompletion(
+      apiKey,
+      "mimo-v2.5",
+      [
+        { role: "system", content: chunk.index === 0 ? ANALYSIS_PROMPT : CONTINUATION_PROMPT },
+        {
+          role: "user",
+          content: [
+            `长文本块：${chunk.index + 1}/${chunk.total}`,
+            knownCharacters ? `已知角色：${knownCharacters}` : "",
+            "当前文本块：",
+            chunk.text,
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+        },
+      ],
+      { type: "json_object" },
+      baseUrl
+    );
+
+    mergeAnalysisResult(merged, normalizeAnalysisResult(JSON.parse(content)), chunk.index);
+  }
+
+  return normalizeAnalysisResult({
+    ...merged,
+    title: merged.title || "长文本朗读任务",
+    summary: merged.summary || `已拆分为 ${chunks.length} 个分析任务，共 ${merged.segments.length} 个朗读段落`,
+  });
+}
+
+type RawArticleSegment = Omit<ArticleSegment, "id"> & Partial<Pick<ArticleSegment, "id">>;
+type RawAnalysisResult = Omit<AnalysisResult, "segments"> & {
+  segments?: RawArticleSegment[];
+};
+
+function normalizeAnalysisResult(result: RawAnalysisResult): AnalysisResult {
+  result.characters = result.characters || {};
+  result.segments = Array.isArray(result.segments) ? result.segments : [];
 
   // Ensure narrator voice is consistent across all narrator segments
   if (result.narratorVoice) {
     result.segments = result.segments.map(
-      (seg: Omit<ArticleSegment, "id">) => {
+      (seg: RawArticleSegment) => {
         if (seg.type === "narration" || seg.characterId === "narrator") {
           return { ...seg, voiceDescription: result.narratorVoice };
         }
@@ -103,7 +172,7 @@ export async function analyzeArticle(
   // Track first segment per character for voice design vs voice clone
   const firstSegmentPerCharacter = new Map<string, boolean>();
   result.segments = result.segments.map(
-    (seg: Omit<ArticleSegment, "id">, idx: number) => {
+    (seg: RawArticleSegment, idx: number) => {
       const charId = seg.characterId || "unknown";
       const isFirst = !firstSegmentPerCharacter.has(charId);
       firstSegmentPerCharacter.set(charId, true);
@@ -126,4 +195,54 @@ export async function analyzeArticle(
   );
 
   return result as AnalysisResult;
+}
+
+function mergeAnalysisResult(target: AnalysisResult, chunkResult: AnalysisResult, chunkIndex: number) {
+  if (chunkIndex === 0) {
+    target.title = chunkResult.title || target.title;
+    target.summary = chunkResult.summary || target.summary;
+    target.narratorVoice = chunkResult.narratorVoice || target.narratorVoice;
+  } else if (!target.summary && chunkResult.summary) {
+    target.summary = chunkResult.summary;
+  }
+
+  if (!target.narratorVoice && chunkResult.narratorVoice) {
+    target.narratorVoice = chunkResult.narratorVoice;
+  }
+
+  for (const [characterId, character] of Object.entries(chunkResult.characters || {})) {
+    if (!target.characters[characterId]) {
+      target.characters[characterId] = character;
+    }
+  }
+
+  const existingCharacterIds = new Set(Object.keys(target.characters));
+  for (const segment of chunkResult.segments || []) {
+    const normalizedSegment = { ...segment };
+    if (normalizedSegment.characterId === "narrator" || normalizedSegment.type === "narration") {
+      normalizedSegment.characterId = "narrator";
+      normalizedSegment.character = normalizedSegment.character || "旁白";
+      normalizedSegment.voiceDescription = target.narratorVoice || normalizedSegment.voiceDescription;
+    } else if (!existingCharacterIds.has(normalizedSegment.characterId)) {
+      target.characters[normalizedSegment.characterId] = {
+        name: normalizedSegment.character,
+        voiceDescription: normalizedSegment.voiceDescription,
+      };
+      existingCharacterIds.add(normalizedSegment.characterId);
+    }
+    target.segments.push(normalizedSegment);
+  }
+}
+
+function buildCharacterContext(result: AnalysisResult): string {
+  const entries = Object.entries(result.characters || {}).map(
+    ([id, character]) =>
+      `${id}: ${character.name}，音色：${character.voiceDescription}`
+  );
+
+  if (result.narratorVoice) {
+    entries.unshift(`narrator: 旁白，音色：${result.narratorVoice}`);
+  }
+
+  return entries.join("\n");
 }

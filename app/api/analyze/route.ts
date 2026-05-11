@@ -4,6 +4,7 @@ import { getServerConfig, isServerMode } from "@/lib/config";
 import { getDBWithMigration } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { checkRateLimit, recordUsage, getClientIp } from "@/lib/rate-limit";
+import { splitArticleForAnalysis } from "@/lib/long-text";
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,7 +41,11 @@ export async function POST(request: NextRequest) {
       rateLimitInfo = { used: rateLimit.used + 1, remaining: rateLimit.remaining - 1, limit: 5 };
     }
 
+    const analysisTasks = splitArticleForAnalysis(article);
     const result = await analyzeArticle(article, apiKey, finalBaseUrl);
+    result.summary = analysisTasks.length > 1
+      ? `${result.summary}（已自动拆分为 ${analysisTasks.length} 个分析任务，适配长文本处理）`
+      : result.summary;
 
     // Save to database in server mode
     let analysisId: number | null = null;
@@ -75,7 +80,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ...result, analysisId, ...(rateLimitInfo && { rateLimit: rateLimitInfo }) });
+    return NextResponse.json({
+      ...result,
+      analysisId,
+      taskCount: analysisTasks.length,
+      ...(rateLimitInfo && { rateLimit: rateLimitInfo }),
+    });
   } catch (error) {
     console.error("Analyze error:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "分析失败" }, { status: 500 });

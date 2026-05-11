@@ -1,4 +1,4 @@
-const MAX_TTS_LENGTH = 2500;
+export const MAX_TTS_LENGTH = 1800;
 
 /**
  * Split text into chunks that fit within TTS limit.

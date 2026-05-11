@@ -1,14 +1,9 @@
 import { getDBWithMigration } from "./db";
 import { ttsCompletion } from "./mimo-client";
-import { saveAudioFromBase64, generateAudioKey } from "./storage";
+import { saveAudioFromBase64, generateAudioKey, getAudioAsBase64 } from "./storage";
+import { splitTextForTTS } from "./text-splitter";
+import { mergeWavBase64 } from "./audio-utils";
 import type { TTSModel } from "./types";
-
-interface PendingTask {
-  id: number;
-  analysis_id: number;
-  segment_index: number;
-  segment_data: string;
-}
 
 /**
  * Check if background worker is enabled (Docker mode only)
@@ -47,34 +42,56 @@ export async function processPendingTasks(): Promise<number> {
   for (const segment of pendingSegments) {
     try {
       const seg = segment as Record<string, unknown>;
-      const ttsModel = (seg.tts_model as string) || "mimo-v2.5-tts-voicedesign";
       const apiKey = process.env.MIMO_API_KEY;
 
       if (!apiKey) continue;
 
-      // Determine model
-      const isFirstOfCharacter = seg.segment_index === 0;
+      const priorForCharacter = await db.prepare(`
+        SELECT audio_file_key
+        FROM audio_segments
+        WHERE analysis_id = ? AND character_id = ? AND segment_index < ?
+          AND audio_file_key IS NOT NULL AND audio_file_key != ''
+        ORDER BY segment_index
+        LIMIT 1
+      `).bind(seg.analysis_id, seg.character_id, seg.segment_index).first<{ audio_file_key: string }>();
+
+      // Determine model. The first segment of each character must be voice design.
+      const isFirstOfCharacter = !priorForCharacter;
       const effectiveModel = isFirstOfCharacter
         ? "mimo-v2.5-tts-voicedesign"
         : "mimo-v2.5-tts-voiceclone";
+      const referenceAudio = priorForCharacter?.audio_file_key
+        ? await getAudioAsBase64(priorForCharacter.audio_file_key)
+        : undefined;
+      const voiceCloneReference = referenceAudio || undefined;
 
-      // Generate audio
-      const audioBase64 = await ttsCompletion(
-        apiKey,
-        effectiveModel as TTSModel,
-        {
-          text: seg.text as string,
-          voiceDescription:
-            effectiveModel === "mimo-v2.5-tts-voicedesign"
-              ? (seg.voice_description as string)
-              : undefined,
-          styleInstruction:
-            effectiveModel !== "mimo-v2.5-tts-voicedesign"
-              ? (seg.style_instruction as string)
-              : undefined,
-          format: "wav",
-        }
-      );
+      const textChunks = splitTextForTTS(seg.text as string);
+      const audioChunks: string[] = [];
+
+      for (const text of textChunks) {
+        audioChunks.push(await ttsCompletion(
+          apiKey,
+          effectiveModel as TTSModel,
+          {
+            text,
+            voiceDescription:
+              effectiveModel === "mimo-v2.5-tts-voicedesign"
+                ? (seg.voice_description as string)
+                : undefined,
+            styleInstruction:
+              effectiveModel !== "mimo-v2.5-tts-voicedesign"
+                ? (seg.style_instruction as string)
+                : undefined,
+            referenceAudio:
+              effectiveModel === "mimo-v2.5-tts-voiceclone"
+                ? voiceCloneReference
+                : undefined,
+            format: "wav",
+          }
+        ));
+      }
+
+      const audioBase64 = mergeWavBase64(audioChunks);
 
       // Save to storage
       const userId = (seg.user_id as number) || 0;

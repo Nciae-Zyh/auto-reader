@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import ArticleInput from "@/components/ArticleInput";
 import SegmentCard from "@/components/SegmentCard";
 import VoiceRecorder from "@/components/VoiceRecorder";
@@ -14,6 +14,7 @@ export default function Home() {
   const [segments, setSegments] = useState<ArticleSegment[]>([]);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [analysisTaskCount, setAnalysisTaskCount] = useState(0);
   const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState("");
@@ -28,15 +29,18 @@ export default function Home() {
   const { settings, baseUrl, mounted, serverMode, hasApiKey } = useSettings();
   const { t } = useI18n();
   const segmentsRef = useRef(segments);
-  segmentsRef.current = segments;
   const characterAudiosRef = useRef(characterAudios);
-  characterAudiosRef.current = characterAudios;
   const personalVoiceRef = useRef(personalVoice);
-  personalVoiceRef.current = personalVoice;
   const readingModeRef = useRef(readingMode);
-  readingModeRef.current = readingMode;
   const analysisIdRef = useRef(analysisId);
-  analysisIdRef.current = analysisId;
+
+  useEffect(() => {
+    segmentsRef.current = segments;
+    characterAudiosRef.current = characterAudios;
+    personalVoiceRef.current = personalVoice;
+    readingModeRef.current = readingMode;
+    analysisIdRef.current = analysisId;
+  }, [analysisId, characterAudios, personalVoice, readingMode, segments]);
 
   const updateSegmentAudio = useCallback((segmentId: string, audioBase64: string) => {
     setSegments((prev) =>
@@ -56,6 +60,7 @@ export default function Home() {
     setSegments([]);
     setTitle("");
     setSummary("");
+    setAnalysisTaskCount(0);
     setAnalysisId(null);
     setCharacterAudios(new Map());
 
@@ -74,6 +79,7 @@ export default function Home() {
       const data = await res.json();
       setTitle(data.title || "");
       setSummary(data.summary || "");
+      setAnalysisTaskCount(data.taskCount || 1);
       setSegments(data.segments || []);
       setAnalysisId(data.analysisId || null);
     } catch (err) {
@@ -332,6 +338,11 @@ export default function Home() {
             <div>
               {title && <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>}
               {summary && <p className="text-sm text-gray-500 dark:text-gray-400">{summary}</p>}
+              {analysisTaskCount > 1 && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  Long text mode: {analysisTaskCount} analysis tasks · {segments.length} reading segments
+                </p>
+              )}
             </div>
             {readingMode === "personal" && (
               <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">{t("personalBadge")}</span>
